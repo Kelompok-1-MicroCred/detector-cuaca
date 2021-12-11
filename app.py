@@ -22,10 +22,8 @@ def home():
 
 @app.route('/predict',methods=['POST'])
 def predict():
-    int_features = [x for x in request.form.values()]
-    final_features = [np.array(int_features)]
-    prediction = model.predict(final_features)
-    output = prediction
+    
+    
 
     wilayah = str(request.form['wilayah'])
     waktu = str(request.form['waktu'])
@@ -34,8 +32,10 @@ def predict():
     banyakkotarawan = str(request.form['banyakkotarawan'])
 
     data = [wilayah, waktu, kelembaban_persen, suhu_derajat_celsius, banyakkotarawan]
-
-    data_df = pd.DataFrame(data=data, columns=items)
+    final_features = [np.array(data)]
+    prediction = model.predict(final_features)
+    output = prediction
+    
 
     return render_template("index.html", prediction_text='Cuaca yang akan terjadi nanti yaitu {}'.format(output))
 
