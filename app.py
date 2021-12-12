@@ -1,17 +1,11 @@
-import numpy as np
+import os
 import pandas as pd
-from flask import Flask, request, jsonify, render_template
-import pickle
-from sklearn import preprocessing
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn import metrics
-from sklearn.metrics import confusion_matrix
-import statsmodels.api as sm
-from sklearn import linear_model
-from tensorflow.keras.preprocessing import image
-from tensorflow.keras.models import load_model
+from flask import Flask, jsonify, request, render_template
+from keras.preprocessing import image
+from keras.models import load_model
 import tensorflow_hub as tfhub
+import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 app = Flask(__name__)
 model = load_model("deeplearning.h5", custom_objects={
@@ -32,23 +26,37 @@ def predict():
     suhu_derajat_celsius = str(request.form['suhu_derajat_celsius'])
     banyakkotarawan = int(request.form['banyakkotarawan'])
     banyakkotarawan = (banyakkotarawan) // 25
-    items = ['wilayah', 'waktu', 'kelembaban_persen', 'suhu_derajat_celsius', 'banyakkotarawan']
+    items = ['wilayah', 'waktu', 'kelembaban_persen', 'suhu_derajat_celcius', 'BanyakKotaRawan']
     data = [[wilayah, waktu, kelembaban_persen, suhu_derajat_celsius, banyakkotarawan]]
     data_df = pd.DataFrame(data=data, columns=items)
 
-    col_cat = [x for x in data_df.columns if x not in ["BanyakKotaRawan"]]
-    for var in col_cat:      
-        cat_list = 'var'+'_'+var
-        cat_list = pd.get_dummies(data_df[var], prefix=var)
-        data1= data_df.join(cat_list)
-        data_df=data1
+    X_df = pd.read_csv("https://raw.githubusercontent.com/ammaresok/Dataset/main/X_data.csv", usecols=items)
+    predict_df = pd.concat([data_df, X_df])
 
-    data_df = [np.array(data_df)]
-    prediction = model.predict(data_df)
-    output = prediction
+    col_cat = [x for x in predict_df.columns if x not in ["BanyakKotaRawan"]]
+    for var in col_cat:
+        catlist = 'var'+''+var
+        cat_list = pd.get_dummies(predict_df[var], prefix=var)
+        data1= predict_df.join(cat_list)
+        predict_df=data1
+    
+    data_vars = predict_df.columns.values.tolist()
+    to_keep = [i for i in data_vars if i not in col_cat]
+    predict_df = predict_df[to_keep].copy()
+
+    sc = StandardScaler()
+    predict_df = pd.DataFrame(StandardScaler().fit_transform(predict_df), columns=predict_df.columns, index=predict_df.index)
+    predictions = model.predict(predict_df.iloc[[0], :])
+    predicted_class_indices=np.argmax(predictions)
+
+    target = ['Berawan', 'Berawan Tebal', 'Cerah', 'Cerah Berawan', 
+          'Hujan', 'Hujan Ringan', 'Hujan Lokal', 'Hujan Petir', 
+          'Hujan Sedang', 'Udara Kabur']
+
+    output = target[predicted_class_indices]
     
 
-    return render_template("index.html", prediction_text='Cuaca yang akan terjadi nanti yaitu {}'.format(output))
+    return render_template("index.html", prediction_text='Cuaca di daerah tersebut kemungkinan {}'. format(output))
 
 @app.route('/results',methods=['POST'])
 def results():
